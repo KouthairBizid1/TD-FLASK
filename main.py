@@ -5,14 +5,18 @@ from decimal import Decimal
 
 import click
 from flask import Flask, flash, redirect, render_template, url_for
+from flask_admin import Admin, AdminIndexView
+from flask_admin.contrib.sqla import ModelView
+from flask_admin.form import SecureForm
+from flask_babel import Babel
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
-from passlib.hash import pbkdf2_sha256
-from sqlalchemy import CheckConstraint, event, select
+from sqlalchemy import CheckConstraint, UniqueConstraint, event, func, select
 from sqlalchemy.exc import IntegrityError
 from wtforms import DateField, DecimalField, PasswordField, SelectField, StringField, SubmitField, TextAreaField
-from wtforms.validators import DataRequired, Email, EqualTo, Length, NumberRange, ValidationError
+from werkzeug.security import generate_password_hash
+from wtforms.validators import DataRequired, Email, Length, NumberRange, Optional, ValidationError
 
 
 app = Flask(__name__)
@@ -21,16 +25,22 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
     "DATABASE_URL", "mysql+pymysql://root@localhost:3306/scol"
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["BABEL_DEFAULT_LOCALE"] = "fr"
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+babel = Babel(app)
 
 
 class User(db.Model):
     __tablename__ = "user"
 
-    username = db.Column(db.String(80), primary_key=True)
-    email = db.Column(db.String(254), unique=True, nullable=False)
-    password = db.Column(db.String(255), nullable=False)
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(200), unique=True, nullable=False)
+    password = db.Column(db.String(200), nullable=False)
+
+    def __str__(self):
+        return self.username
 
 
 class Classe(db.Model):
@@ -41,6 +51,9 @@ class Classe(db.Model):
     NomClass = db.Column(db.String(80), unique=True, nullable=False)
     NbrEtud = db.Column(db.Integer, nullable=False, default=0)
     etudiants = db.relationship("Etudiant", back_populates="classe", cascade="all, delete-orphan")
+
+    def __str__(self):
+        return self.NomClass
 
 
 class Etudiant(db.Model):
@@ -59,6 +72,9 @@ class Etudiant(db.Model):
     classe = db.relationship("Classe", back_populates="etudiants")
     absences = db.relationship("Absence", back_populates="etudiant", cascade="all, delete-orphan")
 
+    def __str__(self):
+        return f"{self.Nom} {self.Prenom}"
+
 
 class Matiere(db.Model):
     __tablename__ = "matiere"
@@ -68,45 +84,58 @@ class Matiere(db.Model):
     Description = db.Column(db.Text, nullable=False, default="")
     absences = db.relationship("Absence", back_populates="matiere", cascade="all, delete-orphan")
 
+    def __str__(self):
+        return self.IntMat
+
 
 class Absence(db.Model):
     __tablename__ = "absence"
-    __table_args__ = (CheckConstraint("NHA > 0"),)
+    __table_args__ = (
+        CheckConstraint("NHA > 0"),
+        UniqueConstraint("CodMat", "NCE", "DateA"),
+    )
 
+    id = db.Column(db.Integer, primary_key=True)
     CodMat = db.Column(
         db.String(20),
         db.ForeignKey("matiere.CodMat", onupdate="CASCADE", ondelete="CASCADE"),
-        primary_key=True,
+        nullable=False,
     )
     NCE = db.Column(
         db.String(20),
         db.ForeignKey("etudiant.NCE", onupdate="CASCADE", ondelete="CASCADE"),
-        primary_key=True,
+        nullable=False,
     )
-    DateA = db.Column(db.Date, primary_key=True)
+    DateA = db.Column(db.Date, nullable=False)
     NHA = db.Column(db.Numeric(5, 2), nullable=False)
     matiere = db.relationship("Matiere", back_populates="absences")
     etudiant = db.relationship("Etudiant", back_populates="absences")
 
 
 @event.listens_for(Etudiant, "after_insert")
-def incrementer_effectif(mapper, connection, etudiant):
+@event.listens_for(Etudiant, "after_update")
+@event.listens_for(Etudiant, "after_delete")
+def recalculer_effectifs(mapper, connection, etudiant):
+    effectif = (
+        select(func.count())
+        .select_from(Etudiant)
+        .where(Etudiant.CodClass == Classe.CodClass)
+        .scalar_subquery()
+    )
     connection.execute(
-        Classe.__table__.update()
-        .where(Classe.CodClass == etudiant.CodClass)
-        .values(NbrEtud=Classe.NbrEtud + 1)
+        Classe.__table__.update().values(NbrEtud=effectif)
     )
 
 
 class UserForm(FlaskForm):
-    username = StringField("Nom d'utilisateur", validators=[DataRequired(), Length(max=80)])
-    email = StringField("Adresse e-mail", validators=[DataRequired(), Email(), Length(max=254)])
-    password = PasswordField("Mot de passe", validators=[DataRequired(), Length(min=8, max=128)])
-    confirmation = PasswordField(
-        "Confirmer le mot de passe",
-        validators=[DataRequired(), EqualTo("password", message="Les mots de passe sont différents.")],
-    )
+    username = StringField("Nom d'utilisateur", validators=[DataRequired(), Length(min=4, max=20)])
+    email = StringField("Adresse e-mail", validators=[DataRequired(), Email(), Length(max=200)])
+    password = PasswordField("Mot de passe", validators=[DataRequired(), Length(min=6)])
     submit = SubmitField("Ajouter")
+
+    def populate_obj(self, obj):
+        obj.username = self.username.data.strip()
+        obj.email = self.email.data.strip().lower()
 
 
 class ClasseForm(FlaskForm):
@@ -154,6 +183,70 @@ class AbsenceForm(FlaskForm):
             raise ValidationError("Saisissez au maximum deux décimales.")
 
 
+class UserAdmin(ModelView):
+    form = UserForm
+    form_base_class = SecureForm
+    page_size = 5
+    page_size_options = (5, 10, 20, 50, 100)
+    can_set_page_size = True
+    column_exclude_list = ["password"]
+
+    def edit_form(self, obj=None):
+        form = super().edit_form(obj)
+        form.password.validators = [Optional(), Length(min=6)]
+        return form
+
+    def on_model_change(self, form, model, is_created):
+        if form.password.data:
+            model.password = generate_password_hash(form.password.data)
+
+
+class ScolariteAdmin(ModelView):
+    form_base_class = SecureForm
+
+
+class ClassesAdmin(ScolariteAdmin):
+    form_columns = ["CodClass", "NomClass"]
+    column_list = ["CodClass", "NomClass", "NbrEtud"]
+
+
+class EtudiantsAdmin(ScolariteAdmin):
+    form_columns = ["NCE", "Nom", "Prenom", "DateNais", "LieuNais", "classe"]
+    column_list = ["NCE", "Nom", "Prenom", "DateNais", "LieuNais", "classe"]
+
+    def on_model_change(self, form, model, is_created):
+        if model.DateNais > date.today():
+            raise ValueError("La date de naissance ne peut pas être dans le futur.")
+
+
+class MatieresAdmin(ScolariteAdmin):
+    form_columns = ["CodMat", "IntMat", "Description"]
+    form_args = {"Description": {"validators": [Length(max=2000)]}}
+
+
+class AbsencesAdmin(ScolariteAdmin):
+    form_columns = ["matiere", "etudiant", "DateA", "NHA"]
+    column_list = ["matiere", "etudiant", "DateA", "NHA"]
+    form_args = {
+        "NHA": {
+            "places": 2,
+            "validators": [
+                DataRequired(),
+                NumberRange(min=Decimal("0.01"), max=Decimal("999.99")),
+                AbsenceForm.validate_NHA,
+            ],
+        },
+    }
+
+
+admin = Admin(app, index_view=AdminIndexView(name="Admin Panel"))
+admin.add_view(UserAdmin(User, db.session))
+admin.add_view(ClassesAdmin(Classe, db.session))
+admin.add_view(EtudiantsAdmin(Etudiant, db.session))
+admin.add_view(MatieresAdmin(Matiere, db.session))
+admin.add_view(AbsencesAdmin(Absence, db.session))
+
+
 def enregistrer(objet, destination):
     db.session.add(objet)
     try:
@@ -182,7 +275,7 @@ def ajouter_user():
             User(
                 username=form.username.data.strip(),
                 email=form.email.data.strip().lower(),
-                password=pbkdf2_sha256.hash(form.password.data),
+                password=generate_password_hash(form.password.data),
             ),
             "ajouter_user",
         )

@@ -1,4 +1,4 @@
-from main import Absence, Classe, Etudiant, Matiere, User, app, db, migrate
+from main import Absence, Classe, Etudiant, Matiere, User, admin, app, babel, db, migrate
 
 
 if __name__ == "__main__":

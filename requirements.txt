@@ -1,6 +1,8 @@
 Flask>=3.1,<4
 Flask-SQLAlchemy>=3.1,<4
 Flask-Migrate>=4.1,<5
+Flask-Admin>=2.0,<3
+Flask-Babel>=4.0,<5
 Flask-mysqldb>=2.0,<3
 Passlib>=1.7.4,<2
 Flask-WTF>=1.2,<2
