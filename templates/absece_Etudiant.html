@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Absences de {{ etudiant.NCE }}{% endblock %}
+{% block content %}
+    <h2>Classe : {{ etudiant.classe.NomClass }}</h2>
+    <p>Étudiant : {{ etudiant.NCE }} &nbsp; Nom : {{ etudiant.Nom }} &nbsp; Prénom : {{ etudiant.Prenom }}</p>
+    <table>
+        <thead>
+            <tr>
+                <th scope="col">Date absence</th>
+                <th scope="col">CodMat</th>
+                <th scope="col">NHA</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for absence in absences %}
+                <tr>
+                    <td>{{ absence.DateA.strftime("%d-%m-%Y") }}</td>
+                    <td>{{ absence.CodMat }}</td>
+                    <td>{{ "%.2f"|format(absence.NHA) }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="3">Aucune absence pour cet étudiant.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

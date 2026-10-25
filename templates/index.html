@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Classes et étudiants</h2>
+    {% for classe in classes %}
+        <section>
+            <h3>{{ classe.NomClass }} ({{ classe.CodClass }})</h3>
+            <p>Nombre d'étudiants : {{ classe.NbrEtud }}</p>
+            <ul>
+                {% for etudiant in classe.etudiants|sort(attribute="NCE") %}
+                    <li>
+                        <a href="{{ url_for('absences_etudiant', cod_class=classe.CodClass, nce=etudiant.NCE) }}">
+                            {{ etudiant.NCE }} — {{ etudiant.Nom }} {{ etudiant.Prenom }}
+                        </a>
+                    </li>
+                {% else %}
+                    <li>Aucun étudiant dans cette classe.</li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% else %}
+        <p>Aucune classe. Ajoutez une classe, ses étudiants et les matières, puis saisissez les absences.</p>
+    {% endfor %}
+{% endblock %}

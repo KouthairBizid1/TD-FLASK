@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ titre }}{% endblock %}
+{% block content %}
+    <h2>{{ titre }}</h2>
+    <form method="post">
+        {{ form.hidden_tag() }}
+        {% for erreur in form.csrf_token.errors %}
+            <p class="error">{{ erreur }}</p>
+        {% endfor %}
+        {% for champ in form if champ.type not in ["CSRFTokenField", "SubmitField"] %}
+            <div class="champ">
+                {{ champ.label }}
+                {% if champ.type == "DecimalField" %}
+                    {{ champ(step="0.01", min="0.01", max="999.99") }}
+                {% else %}
+                    {{ champ() }}
+                {% endif %}
+                {% for erreur in champ.errors %}
+                    <p class="error">{{ erreur }}</p>
+                {% endfor %}
+            </div>
+        {% endfor %}
+        {{ form.submit() }}
+    </form>
+{% endblock %}

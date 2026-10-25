@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Gestion des absences{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Gestion des absences</h1>
+        <nav aria-label="Navigation principale">
+            <a href="{{ url_for('index') }}">Accueil</a>
+            <a href="{{ url_for('ajouter_user') }}">Utilisateur</a>
+            <a href="{{ url_for('ajouter_classe') }}">Classe</a>
+            <a href="{{ url_for('ajouter_etudiant') }}">Étudiant</a>
+            <a href="{{ url_for('ajouter_matiere') }}">Matière</a>
+            <a href="{{ url_for('ajouter_absence') }}">Absence</a>
+        </nav>
+    </header>
+    <main>
+        {% for categorie, message in get_flashed_messages(with_categories=true) %}
+            <p class="message {{ categorie }}" role="status">{{ message }}</p>
+        {% endfor %}
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
