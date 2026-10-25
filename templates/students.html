@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Étudiants{% endblock %}
+{% block content %}
+    <h2>Étudiants</h2>
+    <p><a href="{{ url_for('ajouter_etudiant') }}">Ajouter un étudiant</a></p>
+    <table>
+        <thead>
+            <tr>
+                <th scope="col">Photo</th>
+                <th scope="col">NCE</th>
+                <th scope="col">Nom</th>
+                <th scope="col">Prénom</th>
+                <th scope="col">Classe</th>
+                <th scope="col">Actif</th>
+                <th scope="col">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for etudiant in etudiants %}
+                <tr>
+                    <td>
+                        {% if etudiant.photo %}
+                            <img src="{{ url_for('static', filename='image/' ~ etudiant.photo) }}" alt="Photo de {{ etudiant.Nom }} {{ etudiant.Prenom }}" width="64">
+                        {% else %}
+                            Aucune photo
+                        {% endif %}
+                    </td>
+                    <td>{{ etudiant.NCE }}</td>
+                    <td>{{ etudiant.Nom }}</td>
+                    <td>{{ etudiant.Prenom }}</td>
+                    <td>{{ etudiant.classe.NomClass }}</td>
+                    <td>{{ "Oui" if etudiant.is_active else "Non" }}</td>
+                    <td>
+                        <a href="{{ url_for('edit_student', student_nce=etudiant.NCE) }}">Modifier</a>
+                        <form method="post" action="{{ url_for('delete_student', student_nce=etudiant.NCE) }}" onsubmit="return confirm('Supprimer cet étudiant ?');">
+                            {{ delete_form.hidden_tag() }}
+                            <button type="submit">Supprimer</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="7">Aucun étudiant enregistré.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

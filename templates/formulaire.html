@@ -2,15 +2,21 @@
 {% block title %}{{ titre }}{% endblock %}
 {% block content %}
     <h2>{{ titre }}</h2>
-    <form method="post">
+    <form method="post" enctype="multipart/form-data">
         {{ form.hidden_tag() }}
+        {% if etudiant and etudiant.photo %}
+            <p>Photo actuelle</p>
+            <img src="{{ url_for('static', filename='image/' ~ etudiant.photo) }}" alt="Photo de {{ etudiant.Nom }} {{ etudiant.Prenom }}" width="180">
+        {% endif %}
         {% for erreur in form.csrf_token.errors %}
             <p class="error">{{ erreur }}</p>
         {% endfor %}
         {% for champ in form if champ.type not in ["CSRFTokenField", "SubmitField"] %}
             <div class="champ">
                 {{ champ.label }}
-                {% if champ.type == "DecimalField" %}
+                {% if champ.type == "FileField" %}
+                    {{ champ(accept=".png,.jpg,.jpeg,.gif") }}
+                {% elif champ.type == "DecimalField" %}
                     {{ champ(step="0.01", min="0.01", max="999.99") }}
                 {% else %}
                     {{ champ() }}
